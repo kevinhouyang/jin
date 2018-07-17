@@ -10,14 +10,15 @@ import atexit
 from curses.ascii import ctrl
 
 class Jin():
-    def __init__(self, file=None):
+    def __init__(self, file):
         # initialize fields
         self.dimensions = shutil.get_terminal_size() # stored as (columns, lines)
         self.default_attr = termios.tcgetattr(sys.stdin.fileno())
         self.reset_outbuf()
         self.cx, self.cy = 0, 0 # cursor position
         self.erows = [] # number of rows to display
-        self.frow = 0 # current row in file
+        self.row_offset = 0
+        self.col_offset = 0
 
         if file:
             f = open(file, 'r')
@@ -49,20 +50,29 @@ class Jin():
     def decrementy(self):
         if self.cy:
             self.cy -= 1
+        elif self.row_offset:
+            self.row_offset -= 1
 
     def decrementx(self):
         if self.cx:
             self.cx -= 1
+        elif self.col_offset:
+            self.col_offset -= 1
 
     def incrementy(self):
         if self.cy < self.dimensions.lines:
             self.cy += 1
+        elif self.cy + self.row_offset < len(self.erows):
+            self.row_offset += 1
 
     def incrementx(self):
         if self.cx < self.dimensions.columns:
             self.cx += 1
+        elif self.cx < len(self.erows[self.cy + self.row_offset]):
+            self.col_offset += 1
 
     def process_keypress(self, key_pressed):
+        # switch cases for keypresses
         key_switcher = {
             ctrl('q'): sys.exit,
             'h': self.decrementx,
@@ -88,9 +98,9 @@ class Jin():
         self.write_outbuf()
 
     def draw_rows(self):
-        for i in range(self.dimensions.lines - 1):
+        for i in range(self.dimensions.lines):
             if i < len(self.erows):
-                self.append_outbuf(self.erows[i])
+                self.append_outbuf(self.erows[i + self.row_offset][self.col_offset:self.dimensions.columns + self.col_offset])
             else:
                 self.append_outbuf('~')
                 if i == self.dimensions.lines // 3 and len(self.erows) == 0:
@@ -98,13 +108,14 @@ class Jin():
                     padding = ' ' * ((self.dimensions.columns - len(welcome_msg)) // 2)
                     self.append_outbuf(padding + welcome_msg)
 
-            self.append_outbuf('\r\n') # fills each row with a ~
-        self.append_outbuf('~') # last row
-        self.append_outbuf('\x1b[H') # moves cursor back to top left of screen
+            if i < self.dimensions.lines - 1: # no newline on the last line
+                self.append_outbuf('\r\n')
+
+        self.append_outbuf('\x1b[H') # esc seq moves cursor back to top left of screen
 
 if __name__ == "__main__":
     if len(sys.argv) > 2:
-        print('Error: too much arguments provided')
+        print('Error: too many arguments provided')
         sys.exit()
     elif len(sys.argv) == 2:
         arg = sys.argv[1]
