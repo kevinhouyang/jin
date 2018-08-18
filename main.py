@@ -54,7 +54,7 @@ class Jin():
         if self.erows:
             curr_row = self.erows[self.cy + self.row_offset]
             if len(curr_row) < self.cx:
-                self.cx = len(curr_row) - 1
+                self.cx = len(curr_row)
 
     def decrementx(self):
         if self.cx:
@@ -71,14 +71,14 @@ class Jin():
         if self.erows:
             curr_row = self.erows[self.cy + self.row_offset]
             if len(curr_row) < self.cx:
-                self.cx = len(curr_row) - 1
+                self.cx = len(curr_row)
 
     def incrementx(self):
         if self.erows:
             curr_row = self.erows[self.cy + self.row_offset]
-            if self.cx < self.dimensions.columns and self.cx < len(curr_row) - 1:
+            if self.cx + 1 < self.dimensions.columns and self.cx < len(curr_row):
                 self.cx += 1
-            elif self.cx + self.col_offset < len(curr_row) - 1:
+            elif self.cx + self.col_offset - 1 < len(curr_row):
                 self.col_offset += 1
 
     def begin_line(self):
@@ -88,15 +88,17 @@ class Jin():
     def end_line(self):
         curr_row = self.erows[self.cy + self.row_offset]
         if len(curr_row) < self.dimensions.columns:
-            self.cx = len(curr_row) - 1
+            self.cx = len(curr_row)
         else:
-            self.col_offset = len(curr_row) - self.dimensions.columns
+            self.col_offset = len(curr_row) - self.dimensions.columns + 1
             self.cx = self.dimensions.columns
 
     def read_keypress(self):
         inp = sys.stdin.read(1)
 
-        if inp == '\x1b':
+        if ord(inp) == 127:
+            return 'BACKSPACE'
+        elif inp == '\x1b':
             inp = sys.stdin.read(2)
             if inp[0] == '[':
                 inp_switcher = {
@@ -112,16 +114,13 @@ class Jin():
         # switch cases for keypresses
         key_switcher = {
             ctrl('q'): sys.exit,
-            'h': self.decrementx,
-            'j': self.incrementx,
-            'k': self.decrementy,
-            'l': self.incrementy,
             '0': self.begin_line,
             '$': self.end_line,
             'UP': self.decrementy,
             'DOWN': self.incrementy,
             'RIGHT': self.incrementx,
             'LEFT': self.decrementx,
+            'BACKSPACE': self.editorDeleteChar,
         }
         if key_pressed in key_switcher:
             key_switcher[key_pressed]()
@@ -161,7 +160,7 @@ class Jin():
 
     def draw_rows(self):
         for i in range(self.dimensions.lines):
-            if i < len(self.erows):
+            if i <= len(self.erows) and self.erows:
                 self.append_outbuf(self.erows[i + self.row_offset - 1][self.col_offset:self.dimensions.columns + self.col_offset])
             else:
                 self.append_outbuf('~')
@@ -174,11 +173,11 @@ class Jin():
 
     # row operations
     def rowInsertChar(self, ch):
-        if self.cx < 0 or self.cx > len(self.erows[self.cy]):
-            self.cx = len(self.erows[self.cy])
-        new_string = [x for x in self.erows[self.cy]]
-        new_string = new_string[:self.cx] + [ch] + new_string[self.cx:]
-        self.erows[self.cy] = ''.join(new_string)
+        if self.cx > len(self.erows[self.cy + self.row_offset]) + 1:
+            self.cx = len(self.erows[self.cy + self.row_offset]) + 1
+        new_string = [x for x in self.erows[self.cy + self.row_offset]]
+        new_string = new_string[:self.cx + self.col_offset] + [ch] + new_string[self.cx + self.col_offset:]
+        self.erows[self.cy + self.row_offset] = ''.join(new_string)
 
     def editorInsertChar(self, ch):
         if self.cy == len(self.erows):
@@ -187,6 +186,20 @@ class Jin():
         self.rowInsertChar(ch)
         self.incrementx()
 
+    def editorDeleteChar(self):
+        if self.cx == 0:
+            if self.cy != 0:
+                l = len(self.erows[self.cy + self.row_offset - 1])
+                self.erows[self.cy + self.row_offset - 1] += self.erows[self.cy + self.row_offset]
+                self.erows.pop(self.cy + self.row_offset)
+                self.cx = l
+                self.cy -= 1
+            return
+        new_string = [x for x in self.erows[self.cy + self.row_offset]]
+        new_string = new_string[:self.cx + self.col_offset - 1] + new_string[self.cx + self.col_offset:]
+        self.erows[self.cy + self.row_offset] = ''.join(new_string)
+
+        self.decrementx()
 
 if __name__ == "__main__":
     if len(sys.argv) > 2:
