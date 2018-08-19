@@ -25,6 +25,7 @@ class Jin():
             f = open(file, 'r')
             self.filename = file
             self.erows = f.read().splitlines()
+            f.close()
 
         # enable and disable raw mode
         self.enable_raw()
@@ -110,10 +111,20 @@ class Jin():
                 return inp_switcher[inp[1]]
         return inp
 
+    def save(self):
+        if self.filename == "":
+            return
+
+        buf = '\n'.join(self.erows)
+        f = open(self.filename, 'w')
+        f.write(buf)
+        f.close()
+
     def process_keypress(self, key_pressed):
         # switch cases for keypresses
         key_switcher = {
             ctrl('q'): sys.exit,
+            ctrl('s'): self.save,
             '0': self.begin_line,
             '$': self.end_line,
             'UP': self.decrementy,
